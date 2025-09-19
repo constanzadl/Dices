@@ -36,15 +36,18 @@ export default function DiceGame() {
       diceValueTwo: newDiceTwo,
     });
   };
+
   const joinGame = () => {
     socket.emit("joinRoom", roomId);
   };
+
   const sendValues = () => {
     socket.emit("sendValues", {
       roomId,
       values: { hp: hp, diceOne: diceValueOne, diceTwo: diceValueTwo },
     });
   };
+
   //get dice rolled back
   useEffect(() => {
     socket.on("diceResult", (data) => {
@@ -101,6 +104,25 @@ export default function DiceGame() {
 
     return () => {
       socket.off("playerCountUpdate");
+    };
+  }, []);
+
+  //win or lose
+  //check if you won or not
+  useEffect(() => {
+    socket.on("endGame", ({ message, results, gameInfo }) => {
+      console.log(message);
+
+      Object.entries(results).forEach(([id, result]) => {
+        if (id === userId) {
+          alert(result); // or update state to show it in the UI
+          console.log("Your HP:", gameInfo[id].values.hp);
+        }
+      });
+    });
+
+    return () => {
+      socket.off("endGame");
     };
   }, []);
   return (

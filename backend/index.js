@@ -95,7 +95,24 @@ io.on("connection", (socket) => {
       // Reset submission counter
       rooms[roomId].round.submissions = 0;
 
-      // Send result to all clients
+      //Check endgame
+      if (
+        rooms[roomId].players[userId1].values.hp === 0 ||
+        rooms[roomId].players[userId2].values.hp === 0
+      ) {
+        const results = {};
+
+        Object.entries(rooms[roomId].players).forEach(([id, player]) => {
+          results[id] = player.values.hp === 0 ? "You lose" : "You win";
+        });
+
+        io.to(roomId).emit("endGame", {
+          message: "Game has ended! Thank you for playing",
+          results,
+          gameInfo: rooms[roomId].players,
+        });
+      }
+      // Send result of each round to all clients
       io.to(roomId).emit("roundResult", {
         players: rooms[roomId].players,
       });
