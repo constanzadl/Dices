@@ -3,9 +3,17 @@ const http = require("http");
 const { Server } = require("socket.io");
 
 const app = express();
+const path = require("path");
 
 app.get("/", (req, res) => {
   res.send("Hello from Express backend!");
+});
+
+// Serve frontend
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/dist", "index.html"));
 });
 
 const server = http.createServer(app);
