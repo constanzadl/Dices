@@ -1,109 +1,84 @@
-//Import Express along with http and Socket.IO*
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 
-//Create the Express app
 const app = express();
 
-//Simple route to test
 app.get("/", (req, res) => {
   res.send("Hello from Express backend!");
 });
 
-//Create the HTTP server from Express (so Socket.IO can attach to it)
 const server = http.createServer(app);
 
-//Initialize Socket.IO with CORS allowed
-const io = new Server(server, {
-  cors: { origin: "*" },
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
-//Create rooms
-const rooms = {}; // { roomId: { players: { userId: { socketId, values } } } }
+const rooms = {}; // { roomId: { players: { userId: { socketId, values } }, round: { submissions } } }
 
-//Listen for connections
 io.on("connection", (socket) => {
   const userId = socket.handshake.query.userId;
-  //console.log(`User connected with id: ${userId}`);
 
   socket.on("joinRoom", (roomId) => {
-    if (!rooms[roomId]) {
-      rooms[roomId] = {
-        players: {},
-        round: { submissions: 0 }, // initialize round state
-      };
-    }
+    if (!rooms[roomId])
+      rooms[roomId] = { players: {}, round: { submissions: 0 } };
 
-    // Add this user to the room
-    rooms[roomId].players[userId] = { socketId: socket.id, values: null };
+    rooms[roomId].players[userId] = {
+      socketId: socket.id,
+      values: { hp: 10, diceOne: 0, diceTwo: 0 },
+    };
     socket.join(roomId);
 
-    // Count players
     const playerCount = Object.keys(rooms[roomId].players).length;
-
-    /*  console.log(
-      `${userId} joined room ${roomId}. Players in room: ${playerCount}`
-    );
-*/
-    // Send count back to all clients in the room
     io.to(roomId).emit("playerCountUpdate", playerCount);
-    console.dir(rooms[roomId].players, { depth: null });
   });
 
-  socket.on("diceRolled", (value) => {
-    console.dir(value);
-    // Example: send to everyone (including sender)
-    io.emit("diceResult", { player: userId, value });
+  socket.on("diceRolled", (dice) => {
+    if (rooms[dice.roomId]?.players[userId]) {
+      rooms[dice.roomId].players[userId].values = {
+        ...rooms[dice.roomId].players[userId].values,
+        diceOne: dice.diceValueOne,
+        diceTwo: dice.diceValueTwo,
+      };
+    }
+    io.to(dice.roomId).emit("playerValuesUpdated", {
+      players: rooms[dice.roomId].players,
+    });
   });
 
-  socket.on("sendValues", ({ roomId, values }) => {
-    const userId = socket.handshake.query.userId;
+  socket.on("sendValues", ({ roomId }) => {
+    const userValues = rooms[roomId].players[userId].values;
+    if (!userValues) return;
 
-    // Save player values
-    rooms[roomId].players[userId].values = values;
     rooms[roomId].round.submissions++;
 
-    // If all players submitted, resolve round
     if (
       rooms[roomId].round.submissions ===
       Object.keys(rooms[roomId].players).length
     ) {
-      const allPlayers = Object.values(rooms[roomId].players);
-
-      // === Game logic ===
       const [player1, player2] = Object.entries(rooms[roomId].players);
       const [userId1, p1] = player1;
       const [userId2, p2] = player2;
 
-      // Attack vs Defense check
-      if (p1.values.diceOne > p2.values.diceTwo) {
+      // Attack vs Defense
+      if (p1.values.diceOne > p2.values.diceTwo)
         rooms[roomId].players[userId2].values.hp -=
           p1.values.diceOne - p2.values.diceTwo;
-      }
-      if (p2.values.diceOne > p1.values.diceTwo) {
+      if (p2.values.diceOne > p1.values.diceTwo)
         rooms[roomId].players[userId1].values.hp -=
           p2.values.diceOne - p1.values.diceTwo;
-      }
 
-      // === Reset dice for next round but keep HP ===
-      for (const player of allPlayers) {
-        player.values.diceOne = null;
-        player.values.diceTwo = null;
-      }
+      // Reset dice for next round
+      Object.values(rooms[roomId].players).forEach((player) => {
+        player.values.diceOne = 0;
+        player.values.diceTwo = 0;
+      });
 
-      // Reset submission counter
       rooms[roomId].round.submissions = 0;
 
-      //Check endgame
-      if (
-        rooms[roomId].players[userId1].values.hp === 0 ||
-        rooms[roomId].players[userId2].values.hp === 0
-      ) {
+      // End game check
+      if (p1.values.hp <= 0 || p2.values.hp <= 0) {
         const results = {};
-
         Object.entries(rooms[roomId].players).forEach(([id, player]) => {
-          results[id] = player.values.hp === 0 ? "You lose" : "You win";
+          results[id] = player.values.hp <= 0 ? "You lose" : "You win";
         });
 
         io.to(roomId).emit("endGame", {
@@ -112,18 +87,15 @@ io.on("connection", (socket) => {
           gameInfo: rooms[roomId].players,
         });
       }
-      // Send result of each round to all clients
-      io.to(roomId).emit("roundResult", {
+
+      io.to(roomId).emit("playerValuesUpdated", {
         players: rooms[roomId].players,
       });
     }
   });
 
-  socket.on("disconnect", () => {
-    console.log("Player disconnected:", userId);
-  });
+  socket.on("disconnect", () => console.log("Player disconnected:", userId));
 });
 
-//Start the server:
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
