@@ -1,23 +1,19 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
-
-const app = express();
 const path = require("path");
 
-app.get("/", (req, res) => {
-  res.send("Hello from Express backend!");
-});
+const app = express();
 
-// Serve frontend
+// Serve frontend build (Vite)
 app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
+// Catch-all to support React Router
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/dist", "index.html"));
+  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
 });
 
 const server = http.createServer(app);
-
 const io = new Server(server, { cors: { origin: "*" } });
 
 const rooms = {}; // { roomId: { players: { userId: { socketId, values } }, round: { submissions } } }
