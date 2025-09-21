@@ -1,3 +1,4 @@
+// frontend/DiceGame.jsx
 import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { rollDice } from "../gameLogic/diceGameLogic";
@@ -8,7 +9,7 @@ if (!userId) {
   localStorage.setItem("userId", userId);
 }
 
-// Replace localhost with your deployed Render backend URL
+//Connect to backend for Render to deplot frontend automatically
 const socket = io("https://dice-and-duels.onrender.com", { query: { userId } });
 
 export default function DiceGame() {
@@ -16,6 +17,8 @@ export default function DiceGame() {
   const [diceValueTwo, setDiceValueTwo] = useState(0);
   const [hp, setHp] = useState(10);
   const [playerCount, setPlayerCount] = useState(0);
+
+  //Enemy stats
   const [enemyValues, setEnemyValues] = useState({
     hp: 10,
     diceOne: 0,
@@ -24,14 +27,17 @@ export default function DiceGame() {
 
   let roomId = 1;
 
+  //Join a room
   const joinGame = () => socket.emit("joinRoom", roomId);
 
+  //Roll dice (preview only, does not start round)
   const randomDice = () => {
     const newDiceOne = rollDice();
     const newDiceTwo = rollDice();
     setDiceValueOne(newDiceOne);
     setDiceValueTwo(newDiceTwo);
 
+    //Send dice preview to backend
     socket.emit("diceRolled", {
       roomId,
       diceValueOne: newDiceOne,
@@ -39,26 +45,50 @@ export default function DiceGame() {
     });
   };
 
-  const sendValues = () => socket.emit("sendValues", { roomId });
+  //Submit values and resolve round
+  const sendValues = () =>
+    socket.emit("sendValues", {
+      roomId,
+      values: { hp: hp, diceOne: diceValueOne, diceTwo: diceValueTwo },
+    });
 
   useEffect(() => {
+    //Track number of players in room
     socket.on("playerCountUpdate", (count) => setPlayerCount(count));
 
+    //Sync dice and HP values from backend
     socket.on("playerValuesUpdated", ({ players }) => {
       setHp(players[userId].values.hp);
       const enemy = Object.entries(players).find(([id]) => id !== userId);
-      if (enemy) setEnemyValues(enemy[1]);
+      if (enemy) setEnemyValues(enemy[1].values);
     });
 
+    //Round results: update HP, reset dice
+    socket.on("roundResult", ({ players }) => {
+      const updatedHp = players[userId]?.values.hp;
+      if (updatedHp !== undefined) setHp(updatedHp);
+
+      const enemy = Object.entries(players).find(([id]) => id !== userId);
+      if (enemy) setEnemyValues(enemy[1].values);
+
+      //Reset local dice after each round
+      setDiceValueOne(0);
+      setDiceValueTwo(0);
+    });
+
+    //End game event
+    //TODO: this would change the state of the game and would print message and add buttons to restart/go to home
     socket.on("endGame", ({ results }) => {
       Object.entries(results).forEach(([id, result]) => {
-        if (id === userId) alert(result);
+        if (id === userId) alert(result); // "You win" or "You lose"
       });
     });
 
     return () => socket.off();
   }, []);
 
+  //TODO: FRONTEND - Add buttons to manage choosing which die would be attack and which defense
+  //TODO: FRONTEND - Add remaining abilities to f/e
   return (
     <div>
       <h2>Dice Game Component</h2>
