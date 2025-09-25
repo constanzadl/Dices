@@ -190,85 +190,92 @@ export default function DiceGame() {
         enemy as zero.
       </p>
       {uiMsg && <p style={{ color: "tomato" }}>{uiMsg}</p>}
-      <div className="gameComponent">
-        <div className="playerHub">
-          <h3>Your dice</h3>
-          <button onClick={randomDice} disabled={diceRolled}>
-            Roll Dice
-          </button>
-          <div className="diceValues">
-            <div className="dice">
-              <button
-                className="die"
-                onClick={() => handleSelectDie("one")}
-                disabled={!diceValueOne || used.one}
-              >
-                {diceValueOne}
-              </button>
-              <button
-                className="die"
-                onClick={() => handleSelectDie("two")}
-                disabled={!diceValueTwo || used.two}
-              >
-                {diceValueTwo}
-              </button>
-              <button className="die extra" disabled="true">
-                N/A
-              </button>
-            </div>
-            <div className="values">
-              <p>Attack: {attack}</p>
-              <p>Defense: {defense}</p>
-            </div>
-          </div>
-          <div className="character">
-            <div className="characterCard">
-              <h4>Character card</h4>
-              <div className="cardButtons">
-                <button onClick={() => handlePlace("attack")}>Attack</button>
-                <button onClick={() => handlePlace("defense")}>Defense</button>
-              </div>
-            </div>
-            <div className="characterProfile">Character</div>
-          </div>
-          <p>HP: {hp}</p>
-          <button onClick={sendValues}>Start Round</button>
-        </div>
-        <div className="enemyHub">
-          <h3>Opponent's Dice</h3>
-          <div className="diceValues">
-            <div className="values">
-              <p>Attack: {attack}</p>
-              <p>Defense: {defense}</p>
-            </div>
-            <div className="dice">
-              <button className="die" disabled="true">
-                {enemyValues.diceOne}
-              </button>
-              <button className="die" disabled="true">
-                {enemyValues.diceTwo}
-              </button>
-              <button className="die extra" disabled="true">
-                N/A
-              </button>
-            </div>
-          </div>
-          <div class="character">
-            <div className="characterProfile">Character</div>
-            <div className="characterCard">
-              <h4>Character card</h4>
-              <div className="cardButtons">
-                <span>Attack</span>
-                <span>Defense</span>
-              </div>
-            </div>
-          </div>
 
-          <p>HP: {enemyValues.hp}</p>
-        </div>
-      </div>
       {playerCount === 2 ? (
-        <></>
+        <>
+          {" "}
+          <div className="gameComponent">
+            <div className="playerHub">
+              <h3>Your dice</h3>
+              <button onClick={randomDice} disabled={diceRolled}>
+                Roll Dice
+              </button>
+              <div className="diceValues">
+                <div className="dice">
+                  <button
+                    className="die"
+                    onClick={() => handleSelectDie("one")}
+                    disabled={!diceValueOne || used.one}
+                  >
+                    {diceValueOne}
+                  </button>
+                  <button
+                    className="die"
+                    onClick={() => handleSelectDie("two")}
+                    disabled={!diceValueTwo || used.two}
+                  >
+                    {diceValueTwo}
+                  </button>
+                  <button className="die extra" disabled="true">
+                    N/A
+                  </button>
+                </div>
+                <div className="values">
+                  <p>Attack: {attack}</p>
+                  <p>Defense: {defense}</p>
+                </div>
+              </div>
+              <div className="character">
+                <div className="characterCard">
+                  <h4>Character card</h4>
+                  <div className="cardButtons">
+                    <button onClick={() => handlePlace("attack")}>
+                      Attack
+                    </button>
+                    <button onClick={() => handlePlace("defense")}>
+                      Defense
+                    </button>
+                  </div>
+                </div>
+                <div className="characterProfile">Character</div>
+              </div>
+              <p>HP: {hp}</p>
+              <button onClick={sendValues}>Start Round</button>
+            </div>
+            <div className="enemyHub">
+              <h3>Opponent's Dice</h3>
+              <div className="diceValues">
+                <div className="values">
+                  <p>Attack: {attack}</p>
+                  <p>Defense: {defense}</p>
+                </div>
+                <div className="dice">
+                  <button className="die" disabled="true">
+                    {enemyValues.diceOne}
+                  </button>
+                  <button className="die" disabled="true">
+                    {enemyValues.diceTwo}
+                  </button>
+                  <button className="die extra" disabled="true">
+                    N/A
+                  </button>
+                </div>
+              </div>
+              <div class="character">
+                <div className="characterProfile">Character</div>
+                <div className="characterCard">
+                  <h4>Character card</h4>
+                  <div className="cardButtons">
+                    <span>Attack</span>
+                    <span>Defense</span>
+                  </div>
+                </div>
+              </div>
+
+              <p>HP: {enemyValues.hp}</p>
+            </div>
+          </div>
+        </>
       ) : (
         <>
           <button onClick={joinGame}>Join Game</button>
