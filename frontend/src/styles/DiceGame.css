@@ -1,0 +1,59 @@
+.gameComponent {
+  display: flex;
+  width: 100%;
+  justify-content: space-around;
+}
+
+.playerHub,
+.enemyHub {
+  border: 2px solid black;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  width: 40%;
+}
+.diceValues,
+.character {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 55%;
+}
+
+.dice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.die {
+  border: 3px solid black;
+  border-radius: 10px;
+  width: 50px;
+  height: 50px;
+  margin: 10px;
+}
+.extra {
+  background-color: rgba(121, 2, 2, 0.5);
+  font-weight: bold;
+  color: rgba(155, 8, 8, 0.8);
+}
+
+.characterProfile {
+  border: 3px solid black;
+  height: 200px;
+  width: 100px;
+}
+
+.characterCard {
+  border: 3px solid black;
+  height: 200px;
+  width: 200px;
+  text-align: center;
+}
+
+.cardButtons {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}

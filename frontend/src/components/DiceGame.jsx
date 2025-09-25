@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { rollDice } from "../gameLogic/diceGameLogic";
-
+import "./../styles/DiceGame.css";
 let userId = localStorage.getItem("userId");
 if (!userId) {
   userId = crypto.randomUUID();
@@ -179,53 +179,96 @@ export default function DiceGame() {
   //TODO: FRONTEND - Add remaining abilities to f/e
   return (
     <div>
-      {playerCount === 2 ? (
-        <>
-          <h2>Dice Game Component</h2>
-          <h3>Enemy</h3>
-          <p>HP: {enemyValues.hp}</p>
-          <p>
-            Dices: {enemyValues.diceOne}, {enemyValues.diceTwo}
-          </p>
-
-          <h3>Me</h3>
-          <p>HP: {hp}</p>
-          {/* You click diceValueOne and diceValueTwo and then click on attack or defense buttons to set the values for the sendValues socket */}
-          {/* uIMessage to let the player know what is going on during the game*/}
-          {uiMsg && <p style={{ color: "tomato" }}>{uiMsg}</p>}
-          <p>Place your rolled dice on the attack and defense slots!</p>
-          <p>
-            Remember the attack slot only accepts even numbers, while the
-            defense slot will accept odd numbers only.
-          </p>
-          <p>
-            If you do not choose or cannot make a choice, your dice will go to
-            your enemy as zero.
-          </p>
-          <button
-            onClick={() => handleSelectDie("one")}
-            disabled={!diceValueOne || used.one}
-          >
-            {diceValueOne}
-          </button>
-          <button
-            onClick={() => handleSelectDie("two")}
-            disabled={!diceValueTwo || used.two}
-          >
-            {diceValueTwo}
-          </button>
-          <button onClick={() => handlePlace("attack")}>
-            Attack: {attack}
-          </button>
-          <button onClick={() => handlePlace("defense")}>
-            Defense: {defense}
-          </button>
-
+      <h2>Dice and Duels!</h2>
+      <p>Place your rolled dice on the attack and defense slots!</p>
+      <p>
+        Remember the attack slot only accepts even numbers, while the defense
+        slot will accept odd numbers only.
+      </p>
+      <p>
+        If you do not choose or cannot make a choice, your dice will go to your
+        enemy as zero.
+      </p>
+      {uiMsg && <p style={{ color: "tomato" }}>{uiMsg}</p>}
+      <div className="gameComponent">
+        <div className="playerHub">
+          <h3>Your dice</h3>
           <button onClick={randomDice} disabled={diceRolled}>
             Roll Dice
           </button>
+          <div className="diceValues">
+            <div className="dice">
+              <button
+                className="die"
+                onClick={() => handleSelectDie("one")}
+                disabled={!diceValueOne || used.one}
+              >
+                {diceValueOne}
+              </button>
+              <button
+                className="die"
+                onClick={() => handleSelectDie("two")}
+                disabled={!diceValueTwo || used.two}
+              >
+                {diceValueTwo}
+              </button>
+              <button className="die extra" disabled="true">
+                N/A
+              </button>
+            </div>
+            <div className="values">
+              <p>Attack: {attack}</p>
+              <p>Defense: {defense}</p>
+            </div>
+          </div>
+          <div className="character">
+            <div className="characterCard">
+              <h4>Character card</h4>
+              <div className="cardButtons">
+                <button onClick={() => handlePlace("attack")}>Attack</button>
+                <button onClick={() => handlePlace("defense")}>Defense</button>
+              </div>
+            </div>
+            <div className="characterProfile">Character</div>
+          </div>
+          <p>HP: {hp}</p>
           <button onClick={sendValues}>Start Round</button>
-        </>
+        </div>
+        <div className="enemyHub">
+          <h3>Opponent's Dice</h3>
+          <div className="diceValues">
+            <div className="values">
+              <p>Attack: {attack}</p>
+              <p>Defense: {defense}</p>
+            </div>
+            <div className="dice">
+              <button className="die" disabled="true">
+                {enemyValues.diceOne}
+              </button>
+              <button className="die" disabled="true">
+                {enemyValues.diceTwo}
+              </button>
+              <button className="die extra" disabled="true">
+                N/A
+              </button>
+            </div>
+          </div>
+          <div class="character">
+            <div className="characterProfile">Character</div>
+            <div className="characterCard">
+              <h4>Character card</h4>
+              <div className="cardButtons">
+                <span>Attack</span>
+                <span>Defense</span>
+              </div>
+            </div>
+          </div>
+
+          <p>HP: {enemyValues.hp}</p>
+        </div>
+      </div>
+      {playerCount === 2 ? (
+        <></>
       ) : (
         <>
           <button onClick={joinGame}>Join Game</button>
