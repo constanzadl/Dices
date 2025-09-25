@@ -15,8 +15,20 @@ const socket = io("https://dice-and-duels.onrender.com", { query: { userId } });
 export default function DiceGame() {
   const [diceValueOne, setDiceValueOne] = useState(0);
   const [diceValueTwo, setDiceValueTwo] = useState(0);
+  const [diceRolled, setDiceRolled] = useState(false);
+  //TODO: listen to this value from backend (hp amount depends on class)
   const [hp, setHp] = useState(10);
+
   const [playerCount, setPlayerCount] = useState(0);
+  const [selected, setSelected] = useState(0);
+  //Track if a die is already placed
+  const [used, setUsed] = useState({ one: false, two: false });
+  //Message for user
+  const [uiMsg, setUiMsg] = useState("");
+
+  //These values get sent only after you initialize the round
+  const [attack, setAttack] = useState(0);
+  const [defense, setDefense] = useState(0);
 
   //Enemy stats
   const [enemyValues, setEnemyValues] = useState({
@@ -34,10 +46,20 @@ export default function DiceGame() {
   const randomDice = () => {
     const newDiceOne = rollDice();
     const newDiceTwo = rollDice();
+
+    //Set new dice values
     setDiceValueOne(newDiceOne);
     setDiceValueTwo(newDiceTwo);
 
-    //Send dice preview to backend
+    setDiceRolled(true);
+    //Reset placement UI
+    setAttack(0);
+    setDefense(0);
+    setUsed({ one: false, two: false });
+    setSelected(null);
+    setUiMsg("");
+
+    // 3) notify backend for preview
     socket.emit("diceRolled", {
       roomId,
       diceValueOne: newDiceOne,
@@ -46,12 +68,71 @@ export default function DiceGame() {
   };
 
   //Submit values and resolve round
+  //DiceOne will be the attack and diceTwo the defense to avoid changes on backend
   const sendValues = () =>
     socket.emit("sendValues", {
       roomId,
-      values: { hp: hp, diceOne: diceValueOne, diceTwo: diceValueTwo },
+      values: { hp: hp, diceOne: attack, diceTwo: defense },
     });
 
+  //Select the die and check for checks
+  const handleSelectDie = (which /* 'one' | 'two' */) => {
+    const value = which === "one" ? diceValueOne : diceValueTwo;
+
+    if (!value) {
+      setUiMsg("Roll first.");
+      return;
+    }
+    if (used[which]) {
+      setUiMsg("That die is already placed.");
+      return;
+    }
+
+    setSelected(which);
+    setUiMsg(`Selected die: ${value}`);
+  };
+
+  const handlePlace = (slot /* 'attack' | 'defense' */) => {
+    if (!selected) {
+      setUiMsg("Select a die first.");
+      return;
+    }
+
+    const value = selected === "one" ? diceValueOne : diceValueTwo;
+
+    // Parity checks
+    if (slot === "attack" && !isEven(value)) {
+      setUiMsg("Attack accepts even numbers only.");
+      return;
+    }
+    if (slot === "defense" && !isOdd(value)) {
+      setUiMsg("Defense accepts odd numbers only.");
+      return;
+    }
+
+    // Slot already filled?
+    if (slot === "attack" && attack) {
+      setUiMsg("Attack already set.");
+      return;
+    }
+    if (slot === "defense" && defense) {
+      setUiMsg("Defense already set.");
+      return;
+    }
+
+    // Place value
+    if (slot === "attack") setAttack(value);
+    if (slot === "defense") setDefense(value);
+
+    // Lock the die
+    setUsed((u) => ({ ...u, [selected]: true }));
+
+    // Clear selection
+    setSelected(null);
+    setUiMsg("");
+  };
+
+  //Track num of players, update values to enemy, listen to end of round sequence
   useEffect(() => {
     //Track number of players in room
     socket.on("playerCountUpdate", (count) => setPlayerCount(count));
@@ -71,9 +152,14 @@ export default function DiceGame() {
       const enemy = Object.entries(players).find(([id]) => id !== userId);
       if (enemy) setEnemyValues(enemy[1].values);
 
-      //Reset local dice after each round
+      // Reset local dice & placement after each round
       setDiceValueOne(0);
       setDiceValueTwo(0);
+      setAttack(0);
+      setDefense(0);
+      setUsed({ one: false, two: false });
+      setSelected(null);
+      setUiMsg("");
     });
 
     //End game event
@@ -87,13 +173,15 @@ export default function DiceGame() {
     return () => socket.off();
   }, []);
 
+  const isEven = (n) => typeof n === "number" && n !== 0 && n % 2 === 0;
+  const isOdd = (n) => typeof n === "number" && n !== 0 && n % 2 !== 0;
   //TODO: FRONTEND - Add buttons to manage choosing which die would be attack and which defense
   //TODO: FRONTEND - Add remaining abilities to f/e
   return (
     <div>
-      <h2>Dice Game Component</h2>
       {playerCount === 2 ? (
         <>
+          <h2>Dice Game Component</h2>
           <h3>Enemy</h3>
           <p>HP: {enemyValues.hp}</p>
           <p>
@@ -102,10 +190,40 @@ export default function DiceGame() {
 
           <h3>Me</h3>
           <p>HP: {hp}</p>
-          <p>Attack: {diceValueOne}</p>
-          <p>Defense: {diceValueTwo}</p>
+          {/* You click diceValueOne and diceValueTwo and then click on attack or defense buttons to set the values for the sendValues socket */}
+          {/* uIMessage to let the player know what is going on during the game*/}
+          {uiMsg && <p style={{ color: "tomato" }}>{uiMsg}</p>}
+          <p>Place your rolled dice on the attack and defense slots!</p>
+          <p>
+            Remember the attack slot only accepts even numbers, while the
+            defense slot will accept odd numbers only.
+          </p>
+          <p>
+            If you do not choose or cannot make a choice, your dice will go to
+            your enemy as zero.
+          </p>
+          <button
+            onClick={() => handleSelectDie("one")}
+            disabled={!diceValueOne || used.one}
+          >
+            {diceValueOne}
+          </button>
+          <button
+            onClick={() => handleSelectDie("two")}
+            disabled={!diceValueTwo || used.two}
+          >
+            {diceValueTwo}
+          </button>
+          <button onClick={() => handlePlace("attack")}>
+            Attack: {attack}
+          </button>
+          <button onClick={() => handlePlace("defense")}>
+            Defense: {defense}
+          </button>
 
-          <button onClick={randomDice}>Roll Dice</button>
+          <button onClick={randomDice} disabled={diceRolled}>
+            Roll Dice
+          </button>
           <button onClick={sendValues}>Start Round</button>
         </>
       ) : (
