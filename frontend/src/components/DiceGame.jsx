@@ -160,6 +160,7 @@ export default function DiceGame() {
       setUsed({ one: false, two: false });
       setSelected(null);
       setUiMsg("");
+      setDiceRolled(false);
     });
 
     //End game event
