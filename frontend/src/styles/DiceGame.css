@@ -1,59 +1,113 @@
-.gameComponent {
-  display: flex;
-  width: 100%;
-  justify-content: space-around;
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --border: 3px solid #000;
+  --radius: 8px;
+  --btn-size: 60px;
 }
-
+* {
+  margin: 0;
+  padding: 0;
+}
+.row {
+  display: flex;
+  gap: var(--space-4);
+}
+.center {
+  align-items: center;
+  justify-content: center;
+}
+.stretch {
+  align-items: stretch;
+}
+html {
+  background-image: url("../assets/background.png");
+  margin: 0;
+  padding: 0;
+}
+h2 {
+  margin: 10px 0;
+}
+.gameState {
+  text-align: center;
+}
+.players {
+  display: flex;
+  gap: var(--space-4);
+  align-items: stretch;
+  width: 100%;
+}
 .playerHub,
 .enemyHub {
-  border: 2px solid black;
   display: flex;
   flex-direction: column;
   justify-content: space-around;
   align-items: center;
-  width: 40%;
+  flex: 1 1 0;
+  min-width: 280px;
 }
 .diceValues,
-.character {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 55%;
-}
-
 .dice {
   display: flex;
-  justify-content: space-between;
+  gap: var(--space-4);
   align-items: center;
 }
 .die {
-  border: 3px solid black;
-  border-radius: 10px;
-  width: 50px;
-  height: 50px;
-  margin: 10px;
+  border: none;
+  background: none;
+  color: white;
 }
-.extra {
-  background-color: rgba(121, 2, 2, 0.5);
-  font-weight: bold;
-  color: rgba(155, 8, 8, 0.8);
-}
-
-.characterProfile {
-  border: 3px solid black;
-  height: 200px;
-  width: 100px;
-}
-
-.characterCard {
-  border: 3px solid black;
-  height: 200px;
-  width: 200px;
-  text-align: center;
-}
-
-.cardButtons {
+.character {
   display: flex;
-  justify-content: space-around;
+  gap: var(--space-4);
+  justify-content: center;
+  width: 100%;
+  margin-inline: auto;
+}
+.characterCard,
+.characterProfile {
+  border: var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.characterCard {
+  padding: var(--space-4);
+  gap: var(--space-3);
   align-items: center;
+  justify-content: flex-start;
+}
+.characterProfile {
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-4);
+}
+.cardButtons {
+  display: grid;
+  grid-template-columns: repeat(2, var(--btn-size));
+  grid-auto-rows: var(--btn-size);
+  gap: var(--space-3);
+  place-items: center;
+}
+.cardButtons button {
+  inline-size: var(--btn-size);
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.messageAlert {
+  color: rgb(191, 11, 11);
+  font-size: 1.5rem;
+  background-color: white;
+  margin: 10px 0;
+}
+.timer span {
+  font-size: 1.5rem;
+  margin: 10px 0;
 }

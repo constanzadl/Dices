@@ -3,6 +3,26 @@ import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { rollDice } from "../gameLogic/diceGameLogic";
 import "./../styles/DiceGame.css";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faHandFist,
+  faShieldHalved,
+  faHeart,
+  faDice,
+  faDiceOne,
+  faDiceTwo,
+  faDiceThree,
+  faDiceFour,
+  faDiceFive,
+  faDiceSix,
+  faHatWizard,
+  faHourglass,
+  faSquareFull,
+  faGhost,
+  faDragon,
+} from "@fortawesome/free-solid-svg-icons";
+import { faStar } from "@fortawesome/free-regular-svg-icons";
+
 let userId = localStorage.getItem("userId");
 if (!userId) {
   userId = crypto.randomUUID();
@@ -15,6 +35,7 @@ const socket = io("https://dice-and-duels.onrender.com", { query: { userId } });
 export default function DiceGame() {
   const [diceValueOne, setDiceValueOne] = useState(0);
   const [diceValueTwo, setDiceValueTwo] = useState(0);
+  const [diceValueThree, setDiceValueThree] = useState(0);
   const [diceRolled, setDiceRolled] = useState(false);
   //TODO: listen to this value from backend (hp amount depends on class)
   const [hp, setHp] = useState(10);
@@ -30,11 +51,23 @@ export default function DiceGame() {
   const [attack, setAttack] = useState(0);
   const [defense, setDefense] = useState(0);
 
+  //Dice
+  const diceIcons = {
+    0: faSquareFull,
+    1: faDiceOne,
+    2: faDiceTwo,
+    3: faDiceThree,
+    4: faDiceFour,
+    5: faDiceFive,
+    6: faDiceSix,
+  };
+
   //Enemy stats
   const [enemyValues, setEnemyValues] = useState({
     hp: 10,
     diceOne: 0,
     diceTwo: 0,
+    diceThree: 0,
   });
 
   let roomId = 1;
@@ -179,106 +212,156 @@ export default function DiceGame() {
   //TODO: FRONTEND - Add buttons to manage choosing which die would be attack and which defense
   //TODO: FRONTEND - Add remaining abilities to f/e
   return (
-    <div>
+    <div className="gameState">
       <h2>Dice and Duels!</h2>
-      <p>Place your rolled dice on the attack and defense slots!</p>
-      <p>
-        Remember the attack slot only accepts even numbers, while the defense
-        slot will accept odd numbers only.
-      </p>
-      <p>
-        If you do not choose or cannot make a choice, your dice will go to your
-        enemy as zero.
-      </p>
-      {uiMsg && <p style={{ color: "tomato" }}>{uiMsg}</p>}
-
       {playerCount === 2 ? (
         <>
           {" "}
           <div className="gameComponent">
-            <div className="playerHub">
-              <h3>Your dice</h3>
-              <button onClick={randomDice} disabled={diceRolled}>
-                Roll Dice
-              </button>
-              <div className="diceValues">
-                <div className="dice">
-                  <button
-                    className="die"
-                    onClick={() => handleSelectDie("one")}
-                    disabled={!diceValueOne || used.one}
-                  >
-                    {diceValueOne}
-                  </button>
-                  <button
-                    className="die"
-                    onClick={() => handleSelectDie("two")}
-                    disabled={!diceValueTwo || used.two}
-                  >
-                    {diceValueTwo}
-                  </button>
-                  <button className="die extra" disabled="true">
-                    N/A
-                  </button>
-                </div>
-                <div className="values">
-                  <p>Attack: {attack}</p>
-                  <p>Defense: {defense}</p>
-                </div>
-              </div>
-              <div className="character">
-                <div className="characterCard">
-                  <h4>Character card</h4>
-                  <div className="cardButtons">
-                    <button onClick={() => handlePlace("attack")}>
-                      Attack
-                    </button>
-                    <button onClick={() => handlePlace("defense")}>
-                      Defense
-                    </button>
-                  </div>
-                </div>
-                <div className="characterProfile">Character</div>
-              </div>
-              <p>HP: {hp}</p>
-              <button onClick={sendValues}>Start Round</button>
+            <div className="timer">
+              <FontAwesomeIcon icon={faHourglass} size="2x" />
+              <span>00:30:00</span>
+              <FontAwesomeIcon icon={faHourglass} size="2x" />
             </div>
-            <div className="enemyHub">
-              <h3>Opponent's Dice</h3>
-              <div className="diceValues">
-                <div className="values">
-                  <p>Attack: {attack}</p>
-                  <p>Defense: {defense}</p>
-                </div>
-                <div className="dice">
-                  <button className="die" disabled="true">
-                    {enemyValues.diceOne}
-                  </button>
-                  <button className="die" disabled="true">
-                    {enemyValues.diceTwo}
-                  </button>
-                  <button className="die extra" disabled="true">
-                    N/A
-                  </button>
-                </div>
-              </div>
-              <div class="character">
-                <div className="characterProfile">Character</div>
-                <div className="characterCard">
-                  <h4>Character card</h4>
-                  <div className="cardButtons">
-                    <span>Attack</span>
-                    <span>Defense</span>
+
+            {uiMsg && <p className="messageAlert">{uiMsg}</p>}
+            <div className="players">
+              <div className="playerHub">
+                <h3>Your dice</h3>
+                <button onClick={randomDice} disabled={diceRolled}>
+                  <FontAwesomeIcon icon={faDice} />
+                </button>
+                <div className="diceValues">
+                  <div className="dice">
+                    <button
+                      className="die"
+                      onClick={() => handleSelectDie("one")}
+                      disabled={!diceValueOne || used.one}
+                    >
+                      <FontAwesomeIcon
+                        icon={diceIcons[diceValueOne]}
+                        size="3x"
+                      />
+                    </button>
+                    <button
+                      className="die"
+                      onClick={() => handleSelectDie("two")}
+                      disabled={!diceValueTwo || used.two}
+                    >
+                      <FontAwesomeIcon
+                        icon={diceIcons[diceValueTwo]}
+                        size="3x"
+                      />
+                    </button>
+                    <button className="die extra" disabled="true">
+                      <FontAwesomeIcon
+                        icon={diceIcons[diceValueThree]}
+                        size="3x"
+                      />
+                    </button>
+                  </div>
+                  <div className="values">
+                    <p>
+                      <FontAwesomeIcon icon={faHandFist} /> {attack}
+                    </p>
+                    <p>
+                      <FontAwesomeIcon icon={faShieldHalved} />
+                      {defense}
+                    </p>
                   </div>
                 </div>
+                <div className="character">
+                  <div className="characterCard">
+                    <div className="cardButtons">
+                      <button onClick={() => handlePlace("attack")}>
+                        <FontAwesomeIcon icon={faHandFist} size="2x" />
+                      </button>
+                      <button onClick={() => handlePlace("defense")}>
+                        <FontAwesomeIcon icon={faShieldHalved} size="2x" />
+                      </button>
+                      <button onClick={() => handlePlace("attack")}>
+                        <FontAwesomeIcon icon={faStar} size="2x" />
+                      </button>
+                      <button onClick={() => handlePlace("attack")}>
+                        <FontAwesomeIcon icon={faStar} size="2x" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="characterProfile">
+                    {" "}
+                    <FontAwesomeIcon icon={faGhost} size="8x" />
+                  </div>
+                </div>
+                <p>
+                  <FontAwesomeIcon icon={faHeart} /> {hp}
+                </p>
+                <button onClick={sendValues}>Start Round</button>
               </div>
+              <div className="enemyHub">
+                <h3>Opponent's Dice</h3>
+                <div className="diceValues">
+                  <div className="values">
+                    <p>
+                      <FontAwesomeIcon icon={faHandFist} />
+                    </p>
+                    <p>
+                      <FontAwesomeIcon icon={faShieldHalved} />
+                    </p>
+                  </div>
+                  <div className="dice">
+                    <button className="die" disabled="true">
+                      <FontAwesomeIcon
+                        icon={diceIcons[enemyValues.diceOne]}
+                        size="3x"
+                      />
+                    </button>
+                    <button className="die" disabled="true">
+                      <FontAwesomeIcon
+                        icon={diceIcons[enemyValues.diceTwo]}
+                        size="3x"
+                      />
+                    </button>
+                    <button className="die" disabled="true">
+                      <FontAwesomeIcon
+                        icon={diceIcons[enemyValues.diceThree]}
+                        size="3x"
+                      />
+                    </button>
+                  </div>
+                </div>
+                <div class="character">
+                  <div className="characterProfile">
+                    <FontAwesomeIcon icon={faDragon} size="7x" />
+                  </div>
+                  <div className="characterCard">
+                    <h4>Character card</h4>
+                    <div className="cardButtons">
+                      <button>
+                        <FontAwesomeIcon icon={faHandFist} size="2x" />
+                      </button>
+                      <button>
+                        <FontAwesomeIcon icon={faShieldHalved} size="2x" />
+                      </button>
+                      <button>
+                        <FontAwesomeIcon icon={faStar} size="2x" />
+                      </button>
+                      <button>
+                        <FontAwesomeIcon icon={faStar} size="2x" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-              <p>HP: {enemyValues.hp}</p>
+                <p>
+                  <FontAwesomeIcon icon={faHeart} /> {enemyValues.hp}
+                </p>
+              </div>
             </div>
           </div>
         </>
       ) : (
         <>
+          <></>
           <button onClick={joinGame}>Join Game</button>
           <p>Join Game and wait for player 2!</p>
         </>
