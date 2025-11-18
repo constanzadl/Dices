@@ -199,7 +199,7 @@ export default function DiceGame() {
         ? diceValueTwo
         : diceValueThree;
 
-    //Se revisa si es ataque o defensa con off y even
+    //Se revisa si es ataque o defensa con odd y even
     if (slot === "attack" && !isEven(value)) {
       setUiMsg("Attack accepts even numbers only.");
       return;
