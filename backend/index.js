@@ -20,7 +20,15 @@ app.get("*", (req, res) => {
 const server = http.createServer(app);
 
 //Initialize Socket.io
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, {
+  cors: {
+    origin:
+      process.env.NODE_ENV === "production"
+        ? process.env.FRONTEND_URL || "https://dice-and-duels.onrender.com/"
+        : "http://localhost:5173",
+    methods: ["GET", "POST"],
+  },
+});
 
 /**
  * TO ADD: Clase y de ahí derivan mil cosas xD
@@ -49,7 +57,7 @@ const io = new Server(server, { cors: { origin: "*" } });
  */
 const rooms = {};
 const userRoom = new Map(); //userId -> roomId
-let waitingRoomId = null; //sala en espera para quick match (random)
+const waitingQueue = []; //sala en espera para quick match (random)
 
 //Escoger room ID para el host o random
 function genRoomId() {
@@ -88,10 +96,12 @@ function resetPerRound(roomId) {
 
   //Preparamos siguiente ronda
   room.round.submissions = 0;
+  room.round.submitted = new Set();
   room.round.number += 1;
 
   //Avisamos al frontend que inicia nueva ronda
   io.to(roomId).emit("roundStart", { roundNumber: room.round.number });
+  io.to(roomId).emit("playerValuesUpdated", { players: room.players });
 }
 
 //Resetea TODA la partida (HP y dados) pero mantiene a los jugadores en la misma sala // TO DO: REVISAR PARA QUE HAYA LA OPCION DE QUEDARSE O IRSE
@@ -146,12 +156,27 @@ function leaveRoom(userId) {
 
   //Si ya no hay nadie, borrar sala
   if (getPlayerCount(roomId) === 0) {
-    if (waitingRoomId === roomId) waitingRoomId = null;
+    const idx = waitingQueue.indexOf(roomId);
+    if (idx !== -1) waitingQueue.splice(idx, 1);
     delete rooms[roomId];
   }
   return roomId;
 }
 
+//Creae Player
+function createPlayer(socketId) {
+  return {
+    socketId,
+    values: {
+      hp: 10,
+      diceOne: null,
+      diceTwo: null,
+      diceThree: null,
+      special1: null,
+      special2: null,
+    },
+  };
+}
 //Listen for connections
 io.on("connection", (socket) => {
   const userId = socket.handshake.query.userId;
@@ -161,21 +186,10 @@ io.on("connection", (socket) => {
     const roomId = genRoomId();
     ensureRoom(roomId);
 
-    rooms[roomId].players[userId] = {
-      socketId: socket.id,
-      values: {
-        hp: 10,
-        diceOne: null,
-        diceTwo: null,
-        diceThree: null,
-        special1: null,
-        special2: null,
-      },
-    };
+    rooms[roomId].players[userId] = createPlayer(socket.id);
 
     userRoom.set(userId, roomId);
     socket.join(roomId);
-    waitingRoomId = roomId;
     socket.emit("roomCreated", { roomId });
     io.to(roomId).emit("playerCountUpdate", getPlayerCount(roomId));
   });
@@ -192,17 +206,7 @@ io.on("connection", (socket) => {
     }
 
     if (!room.players[userId]) {
-      room.players[userId] = {
-        socketId: socket.id,
-        values: {
-          hp: 10,
-          diceOne: null,
-          diceTwo: null,
-          diceThree: null,
-          special1: null,
-          special2: null,
-        },
-      };
+      rooms[roomId].players[userId] = createPlayer(socket.id);
     } else {
       room.players[userId].socketId = socket.id;
     }
@@ -216,109 +220,54 @@ io.on("connection", (socket) => {
     if (getPlayerCount(roomId) === 2) {
       room.round.submissions = 0;
       room.round.number = 1;
-      if (waitingRoomId === roomId) waitingRoomId = null;
+      waitingQueue.splice(waitingQueue.indexOf(roomId), 1);
       io.to(roomId).emit("roundStart", { roundNumber: room.round.number });
     }
   });
 
   //QUICK MATCH (random)
   socket.on("joinRandom", () => {
+    // Buscar sala en espera
+    const existingRoomId = waitingQueue.shift(); // saca el primero de la fila
     //Si hay una sala esperando con 1 jugador, únete
     if (
-      waitingRoomId &&
-      rooms[waitingRoomId] &&
-      getPlayerCount(waitingRoomId) === 1
+      existingRoomId &&
+      rooms[existingRoomId] &&
+      getPlayerCount(existingRoomId) === 1
     ) {
-      const roomId = waitingRoomId;
-      const room = rooms[roomId];
-
-      room.players[userId] = {
-        socketId: socket.id,
-        values: {
-          hp: 10,
-          diceOne: null,
-          diceTwo: null,
-          diceThree: null,
-          special1: null,
-          special2: null,
-        },
-      };
-      userRoom.set(userId, roomId);
-      socket.join(roomId);
-      socket.emit("joinedRoom", { roomId });
-      io.to(roomId).emit("playerCountUpdate", getPlayerCount(roomId));
+      const room = rooms[existingRoomId];
+      room.players[userId] = createPlayer(socket.id);
+      userRoom.set(userId, existingRoomId);
+      socket.join(existingRoomId);
+      socket.emit("joinedRoom", { roomId: existingRoomId });
+      io.to(existingRoomId).emit(
+        "playerCountUpdate",
+        getPlayerCount(existingRoomId),
+      );
 
       //Ya hay 2 → empezar
       room.round.submissions = 0;
       room.round.number = 1;
-      waitingRoomId = null;
-      io.to(roomId).emit("roundStart", { roundNumber: 1 });
+
+      io.to(existingRoomId).emit("roundStart", { roundNumber: 1 });
     } else {
       //Crea nueva y queda esperando
       const roomId = genRoomId();
       ensureRoom(roomId);
-      rooms[roomId].players[userId] = {
-        socketId: socket.id,
-        values: {
-          hp: 10,
-          diceOne: null,
-          diceTwo: null,
-          diceThree: null,
-          special1: null,
-          special2: null,
-        },
-      };
+      rooms[roomId].players[userId] = createPlayer(socket.id);
+      waitingQueue.push(roomId); // ← push en lugar de asignar
       userRoom.set(userId, roomId);
       socket.join(roomId);
-      waitingRoomId = roomId;
       socket.emit("roomCreated", { roomId });
       io.to(roomId).emit("playerCountUpdate", getPlayerCount(roomId));
     }
   });
-
+  //AQUI YA NO
   //Salida voluntaria (volver a lobby)
   socket.on("leaveRoom", () => {
     const leftRoom = leaveRoom(userId);
     if (leftRoom) socket.leave(leftRoom);
     socket.emit("returnedToLobby");
-  });
-
-  //JoinRoom simple (testing local)
-  socket.on("joinRoom", (roomId) => {
-    ensureRoom(roomId);
-    const room = rooms[roomId];
-
-    if (Object.keys(room.players).length >= 2 && !room.players[userId]) {
-      socket.emit("roomFull", { roomId });
-      return;
-    }
-
-    if (!room.players[userId]) {
-      room.players[userId] = {
-        socketId: socket.id,
-        values: {
-          hp: 10,
-          diceOne: null,
-          diceTwo: null,
-          diceThree: null,
-          special1: null,
-          special2: null,
-        },
-      };
-    } else {
-      room.players[userId].socketId = socket.id;
-    }
-
-    socket.join(roomId);
-    userRoom.set(userId, roomId);
-
-    io.to(roomId).emit("playerCountUpdate", getPlayerCount(roomId));
-
-    if (getPlayerCount(roomId) === 2) {
-      room.round.submissions = 0;
-      room.round.number = 1;
-      io.to(roomId).emit("roundStart", { roundNumber: room.round.number });
-    }
   });
 
   //Game logic
@@ -345,7 +294,9 @@ io.on("connection", (socket) => {
   socket.on("sendValues", ({ roomId, values }) => {
     const room = rooms[roomId];
     if (!room || !room.players[userId]) return;
-
+    if (room.round.submitted?.has(userId)) return;
+    if (!room.round.submitted) room.round.submitted = new Set();
+    room.round.submitted.add(userId);
     //Extraemos solo los dados finales (ataque/defensa) y slots especiales
     const { diceOne, diceTwo, special1, special2 } = values;
 
@@ -360,9 +311,9 @@ io.on("connection", (socket) => {
     room.round.submissions++;
 
     //Avisamos al frontend del estado actual de todos los jugadores
-    io.to(roomId).emit("playerValuesUpdated", {
+    /*io.to(roomId).emit("playerValuesUpdated", {
       players: room.players,
-    });
+    });*/
 
     //If both players sent values, start round
     if (room.round.submissions === Object.keys(room.players).length) {
@@ -373,14 +324,22 @@ io.on("connection", (socket) => {
 
       //Game logic, right now die 1 is attack and die 2 is defense
       if (p1.values.diceOne > p2.values.diceTwo) {
-        room.players[userId2].values.hp -=
-          p1.values.diceOne - p2.values.diceTwo;
+        const dmg = p1.values.diceOne - p2.values.diceTwo;
+        room.players[userId2].values.hp = Math.max(
+          0,
+          room.players[userId2].values.hp - dmg,
+        );
       }
       if (p2.values.diceOne > p1.values.diceTwo) {
-        room.players[userId1].values.hp -=
-          p2.values.diceOne - p1.values.diceTwo;
+        const dmg = p2.values.diceOne - p1.values.diceTwo;
+        room.players[userId1].values.hp = Math.max(
+          0,
+          room.players[userId1].values.hp - dmg,
+        );
       }
-
+      for (const p of Object.values(room.players)) {
+        p.values.diceThree = null;
+      }
       //Mandamos resultado de la ronda (HP actualizados)
       io.to(roomId).emit("roundResult", {
         players: room.players,

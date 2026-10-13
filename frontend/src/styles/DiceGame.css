@@ -11,6 +11,9 @@
   margin: 0;
   padding: 0;
 }
+.gameComponent {
+padding-top: 10px;
+}
 .row {
   display: flex;
   gap: var(--space-4);
@@ -110,4 +113,54 @@ h2 {
 .timer span {
   font-size: 1.5rem;
   margin: 10px 0;
+}
+/* ── Layout del juego ── */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: rgba(47, 58, 55, 0.9);
+  color: #E7E3DC;
+  border-bottom: 2px solid #5A4634;
+}
+
+.hud {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.roomInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 14px;
+  color: #D0C6B4;
+}
+
+/* ── Lobby ── */
+.lobbyButtons {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  margin: var(--space-4) 0;
+}
+
+.joinByCode {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+/* ── Mensajes ── */
+.messageBanner {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #E7E3DC;
+  background: rgba(47, 58, 55, 0.7);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius);
+  display: inline-block;
 }

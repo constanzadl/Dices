@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { io } from "socket.io-client";
 import { rollDice } from "../gameLogic/diceGameLogic";
 import "./../styles/DiceGame.css";
@@ -21,23 +21,33 @@ import {
   faDragon,
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar } from "@fortawesome/free-regular-svg-icons";
+import Waiting from "./Waiting";
+import EndGame from "./EndGame";
 
 //Se genera el ID del jugador
-let userId = localStorage.getItem("userId");
-if (!userId) {
-  userId = crypto.randomUUID();
-  localStorage.setItem("userId", userId);
-}
+const userId = (() => {
+  let id = localStorage.getItem("userId");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("userId", id);
+  }
+  return id;
+})();
 
 // URL del backend
 const SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://localhost:3000";
-const socket = io(SOCKET_URL, { query: { userId } });
-
 export default function DiceGame() {
+  const socket = useMemo(() => io(SOCKET_URL, { query: { userId } }), []);
   //Lobby-Room state
   const [mode, setMode] = useState("lobby");
   const [roomId, setRoomId] = useState("");
   const [codeInput, setCodeInput] = useState("");
+
+  //Refs
+  const modeRef = useRef(mode);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   //Player Values
   const [diceValueOne, setDiceValueOne] = useState(0);
@@ -48,6 +58,7 @@ export default function DiceGame() {
 
   //TODO: listen to this value from backend (hp amount depends on class)
   const [hp, setHp] = useState(10);
+  const [submitted, setSubmitted] = useState(false);
 
   const [playerCount, setPlayerCount] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -64,6 +75,8 @@ export default function DiceGame() {
   const [special1, setSpecial1] = useState(0);
   const [special2, setSpecial2] = useState(0);
 
+  //Resultado final de la partida (lo manda el backend)
+  const [endResult, setEndResult] = useState(null);
   //Número de ronda (lo manda el backend)
   const [roundNumber, setRoundNumber] = useState(1);
   //Mensaje global de juego (Round X, You win, Tie, etc.) TO DELETE, se volverá una pantalla
@@ -113,6 +126,7 @@ export default function DiceGame() {
     setSelected(null);
     setUiMsg("");
     setDiceRolled(false);
+    setSubmitted(false);
   };
 
   // Roll dice (preview only, does not start round)
@@ -148,17 +162,20 @@ export default function DiceGame() {
   };
 
   //Submit values and resolve round
-  const sendValues = () =>
+  const sendValues = () => {
+    if (submitted) return;
+    setSubmitted(true);
     roomId &&
-    socket.emit("sendValues", {
-      roomId,
-      values: {
-        diceOne: attack,
-        diceTwo: defense,
-        special1,
-        special2,
-      },
-    });
+      socket.emit("sendValues", {
+        roomId,
+        values: {
+          diceOne: attack,
+          diceTwo: defense,
+          special1,
+          special2,
+        },
+      });
+  };
 
   //Select the die and check for checks
   //TO CHANGE - SERÁ DRAG AND DROP
@@ -167,8 +184,8 @@ export default function DiceGame() {
       which === "one"
         ? diceValueOne
         : which === "two"
-        ? diceValueTwo
-        : diceValueThree;
+          ? diceValueTwo
+          : diceValueThree;
 
     if (!value) {
       setUiMsg("Roll first.");
@@ -185,7 +202,7 @@ export default function DiceGame() {
 
   //TMBN TO CHANGE SERA DRAG AND DROP
   const handlePlace = (
-    slot /* 'attack' | 'defense' | 'special1' | 'special2' */
+    slot /* 'attack' | 'defense' | 'special1' | 'special2' */,
   ) => {
     if (!selected) {
       setUiMsg("Select a die first.");
@@ -196,8 +213,8 @@ export default function DiceGame() {
       selected === "one"
         ? diceValueOne
         : selected === "two"
-        ? diceValueTwo
-        : diceValueThree;
+          ? diceValueTwo
+          : diceValueThree;
 
     //Se revisa si es ataque o defensa con odd y even
     if (slot === "attack" && !isEven(value)) {
@@ -246,20 +263,19 @@ export default function DiceGame() {
 
   //Track num of players, update values to enemy, listen to end of round sequence
   useEffect(() => {
-    //Lobby
-    socket.on("roomCreated", ({ roomId }) => {
+    const onRoomCreated = ({ roomId }) => {
       setRoomId(roomId);
-      setMode("inRoom");
+      setMode("waiting");
       setGameMsg(`Room: ${roomId} (waiting opponent)`);
-    });
+    };
 
-    socket.on("joinedRoom", ({ roomId }) => {
+    const onJoinedRoom = ({ roomId }) => {
       setRoomId(roomId);
       setMode("inRoom");
       setGameMsg(`Room: ${roomId}`);
-    });
+    };
 
-    socket.on("returnedToLobby", () => {
+    const onReturnedToLobby = () => {
       setMode("lobby");
       setRoomId("");
       setPlayerCount(0);
@@ -274,79 +290,92 @@ export default function DiceGame() {
         special2: 0,
       });
       resetLocalRound();
-    });
+    };
 
-    socket.on("opponentLeft", () => {
+    const onOpponentLeft = () => {
+      if (modeRef.current === "endGame") return;
       setGameMsg("Your opponent left. Returning to lobby…");
       setTimeout(() => leaveRoom(), 800);
-    });
+    };
 
-    //Game events
-    //Track number of players in room
-    socket.on("playerCountUpdate", (count) => setPlayerCount(count));
+    const onPlayerCountUpdate = (count) => {
+      setPlayerCount(count);
+      if (count === 2) setMode("inRoom");
+    };
 
-    //Sync dice and HP values from backend
-    socket.on("playerValuesUpdated", ({ players }) => {
-      if (players[userId]?.values?.hp !== undefined) {
+    const onPlayerValuesUpdated = ({ players }) => {
+      if (players[userId]?.values?.hp !== undefined)
         setHp(players[userId].values.hp);
-      }
       const enemy = Object.entries(players).find(([id]) => id !== userId);
       if (enemy) setEnemyValues(enemy[1].values);
-    });
+    };
 
-    //Nueva ronda
-    socket.on("roundStart", ({ roundNumber }) => {
+    const onRoundStart = ({ roundNumber }) => {
       setRoundNumber(roundNumber);
       setGameMsg(`Round ${roundNumber}`);
-    });
+    };
 
-    //Round results: update HP, reset dice
-    socket.on("roundResult", ({ players }) => {
+    const onRoundResult = ({ players }) => {
       const updatedHp = players[userId]?.values.hp;
       if (updatedHp !== undefined) setHp(updatedHp);
-
       const enemy = Object.entries(players).find(([id]) => id !== userId);
       if (enemy) setEnemyValues(enemy[1].values);
-
-      //Reset local dice & placement after each round
       resetLocalRound();
-    });
+    };
 
-    //End game event (incluye Tie)
-    socket.on("endGame", ({ results }) => {
+    const onEndGame = ({ results }) => {
       Object.entries(results).forEach(([id, result]) => {
         if (id === userId) {
           setGameMsg(result);
-          alert(result); //placeholder TO DELETE se hará un UI
+          setEndResult(result);
         }
       });
-    });
+      setMode("endGame");
+    };
 
-    //Reinicio automático de partida (HP vuelven y Round 1) TO DELETE AND CHANGE habra opcion de empezar o no
-    socket.on("gameReset", ({ message, roundNumber, players }) => {
+    const onGameReset = ({ message, roundNumber, players }) => {
       setGameMsg(message);
       setRoundNumber(roundNumber);
-
       const me = players[userId];
       if (me) setHp(me.values.hp);
-
       const enemy = Object.entries(players).find(([id]) => id !== userId);
       if (enemy) setEnemyValues(enemy[1].values);
-
       resetLocalRound();
-    });
+    };
 
-    //Room llena
-    socket.on("roomFull", () => {
-      setUiMsg("Room is full. Please try again later.");
-    });
+    const onRoomFull = () => setUiMsg("Room is full. Please try again later.");
 
-    return () => socket.off();
+    socket.on("roomCreated", onRoomCreated);
+    socket.on("joinedRoom", onJoinedRoom);
+    socket.on("returnedToLobby", onReturnedToLobby);
+    socket.on("opponentLeft", onOpponentLeft);
+    socket.on("playerCountUpdate", onPlayerCountUpdate);
+    socket.on("playerValuesUpdated", onPlayerValuesUpdated);
+    socket.on("roundStart", onRoundStart);
+    socket.on("roundResult", onRoundResult);
+    socket.on("endGame", onEndGame);
+    socket.on("gameReset", onGameReset);
+    socket.on("roomFull", onRoomFull);
+
+    return () => {
+      socket.off("roomCreated", onRoomCreated);
+      socket.off("joinedRoom", onJoinedRoom);
+      socket.off("returnedToLobby", onReturnedToLobby);
+      socket.off("opponentLeft", onOpponentLeft);
+      socket.off("playerCountUpdate", onPlayerCountUpdate);
+      socket.off("playerValuesUpdated", onPlayerValuesUpdated);
+      socket.off("roundStart", onRoundStart);
+      socket.off("roundResult", onRoundResult);
+      socket.off("endGame", onEndGame);
+      socket.off("gameReset", onGameReset);
+      socket.off("roomFull", onRoomFull);
+      socket.disconnect(); // limpieza real al desmontar
+    };
   }, []);
 
   return (
     <div className="gameState">
-      {mode === "lobby" ? (
+      {mode === "lobby" && (
         <div className="lobby">
           <h2>Dice and Duels!</h2>
 
@@ -366,11 +395,14 @@ export default function DiceGame() {
 
           {uiMsg && <p className="messageAlert">{uiMsg}</p>}
         </div>
-      ) : (
+      )}
+
+      {mode === "waiting" && <Waiting roomId={roomId} onLeave={leaveRoom} />}
+
+      {mode === "inRoom" && (
         <>
           <div className="topbar">
             <div className="hud">
-              <h3>Round {roundNumber}</h3>
               {gameMsg && <p className="messageBanner">{gameMsg}</p>}
             </div>
             <div className="roomInfo">
@@ -469,8 +501,11 @@ export default function DiceGame() {
                 <p>
                   <FontAwesomeIcon icon={faHeart} /> {hp}
                 </p>
-                <button onClick={sendValues} disabled={!attack || !defense}>
-                  Start Round
+                <button
+                  onClick={sendValues}
+                  disabled={!diceRolled || submitted}
+                >
+                  {submitted ? "Waiting..." : "Start Round"}
                 </button>
               </div>
 
@@ -488,19 +523,19 @@ export default function DiceGame() {
                   <div className="dice">
                     <button className="die" disabled={true}>
                       <FontAwesomeIcon
-                        icon={diceIcons[enemyValues.diceOne]}
+                        icon={diceIcons[enemyValues.diceOne ?? 0]}
                         size="3x"
                       />
                     </button>
                     <button className="die" disabled={true}>
                       <FontAwesomeIcon
-                        icon={diceIcons[enemyValues.diceTwo]}
+                        icon={diceIcons[enemyValues.diceTwo ?? 0]}
                         size="3x"
                       />
                     </button>
                     <button className="die" disabled={true}>
                       <FontAwesomeIcon
-                        icon={diceIcons[enemyValues.diceThree]}
+                        icon={diceIcons[enemyValues.diceThree ?? 0]}
                         size="3x"
                       />
                     </button>
@@ -538,6 +573,8 @@ export default function DiceGame() {
           </div>
         </>
       )}
+
+      {mode === "endGame" && <EndGame result={endResult} onLeave={leaveRoom} />}
     </div>
   );
 }
