@@ -1,0 +1,91 @@
+{
+  "barbarian": {
+    "id": "barbarian",
+    "name": "Barbarian",
+    "hp": 20,
+    "dice": { "normal": 3, "magic": 0 },
+    "skills": {
+      "special1": {
+        "id": "rage",
+        "name": "Rage",
+        "slotType": "countdown",
+        "turnsToReady": 2,
+        "effect": "attack_x2",
+        "sideEffect": { "stat": "defense", "modifier": -1, "while": "charging" },
+        "onReady": "lock_slot",
+        "description": "Charge for 2 turns. Next attack deals x2 damage. -1 defense while charging."
+      },
+      "special2": {
+        "id": "dice_plus_one",
+        "name": "Dice +1",
+        "slotType": "dice_modification",
+        "timing": "dice_modification_phase",
+        "effect": "add_to_die",
+        "effectValue": 1,
+        "cooldown": null,
+        "description": "During dice modification phase, add +1 to any die."
+      }
+    }
+  },
+
+  "rogue": {
+    "id": "rogue",
+    "name": "Rogue",
+    "hp": 15,
+    "dice": { "normal": 3, "magic": 0 },
+    "skills": {
+      "special1": {
+        "id": "hidden_blade",
+        "name": "Hidden Blade",
+        "slotType": "condition",
+        "condition": { "operator": "lte", "threshold": 2 },
+        "effect": "imminent_damage",
+        "effectValue": "die_value",
+        "buffedByHide": { "effectValue": "+1" },
+        "description": "Place a die of 1 or 2. Deals imminent damage equal to die value (cannot be defended). +1 while hiding."
+      },
+      "special2": {
+        "id": "hide",
+        "name": "Hide",
+        "slotType": "on_off",
+        "condition": "any_die",
+        "effect": "enter_hide",
+        "buffs": [
+          { "skill": "hidden_blade", "modifier": 1 },
+          { "stat": "defense", "modifier": 1 }
+        ],
+        "penalty": { "dice": -1 },
+        "description": "Place any die to toggle hiding. While hidden: roll 2 dice, Hidden Blade +1, Defense +1."
+      }
+    }
+  },
+
+  "wizard": {
+    "id": "wizard",
+    "name": "Wizard",
+    "hp": 15,
+    "dice": { "normal": 2, "magic": 1 },
+    "skills": {
+      "special1": {
+        "id": "fireball",
+        "name": "Fireball",
+        "slotType": "condition",
+        "condition": { "dieType": "magic" },
+        "effect": "accumulate_damage",
+        "accumulatePerTurn": 1,
+        "baseValue": 1,
+        "resetsOnUse": true,
+        "description": "Magic die only. Gains +1 power each turn unused. Deals accumulated damage on use and resets to base +1."
+      },
+      "special2": {
+        "id": "reroll",
+        "name": "Re-roll",
+        "slotType": "dice_modification",
+        "timing": "dice_modification_phase",
+        "effect": "reroll_die",
+        "cooldown": 2,
+        "description": "During dice modification phase, re-roll one die. Cooldown: 2 turns."
+      }
+    }
+  }
+}

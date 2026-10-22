@@ -23,6 +23,7 @@ import {
 import { faStar } from "@fortawesome/free-regular-svg-icons";
 import Waiting from "./Waiting";
 import EndGame from "./EndGame";
+import CharacterSelect from "./CharacterSelect";
 
 //Se genera el ID del jugador
 const userId = (() => {
@@ -58,6 +59,17 @@ export default function DiceGame() {
 
   //TODO: listen to this value from backend (hp amount depends on class)
   const [hp, setHp] = useState(10);
+  // Clase seleccionada por el jugador
+  const [character, setCharacter] = useState(null);
+  const [rageCharges, setRageCharges] = useState(0);
+  const [rageReady, setRageReady] = useState(false);
+  const [fireballActive, setFireballActive] = useState(false);
+  const [fireballPower, setFireballPower] = useState(0);
+  const [hideActive, setHideActive] = useState(false);
+  const [hideExitBonus, setHideExitBonus] = useState(false);
+  const [dicePlusOneUsed, setDicePlusOneUsed] = useState(false);
+  const [rerollUsed, setRerollUsed] = useState(false);
+  const [rerollCooldown, setRerollCooldown] = useState(0);
   const [submitted, setSubmitted] = useState(false);
 
   const [playerCount, setPlayerCount] = useState(0);
@@ -92,7 +104,8 @@ export default function DiceGame() {
     5: faDiceFive,
     6: faDiceSix,
   };
-
+  //Timer
+  const [timeLeft, setTimeLeft] = useState(30);
   //Enemy stats
   const [enemyValues, setEnemyValues] = useState({
     hp: 10,
@@ -127,13 +140,16 @@ export default function DiceGame() {
     setUiMsg("");
     setDiceRolled(false);
     setSubmitted(false);
+    setDicePlusOneUsed(false);
+    setRerollUsed(false);
   };
 
   // Roll dice (preview only, does not start round)
   const randomDice = () => {
     const newDiceOne = rollDice();
     const newDiceTwo = rollDice();
-    const newDiceThree = rollDice(); // 3er dado
+    // Rogue hiding: solo 2 dados
+    const newDiceThree = (hideActive && character?.id === "rogue") ? 0 : rollDice();
 
     // Set new dice values
     setDiceValueOne(newDiceOne);
@@ -216,6 +232,17 @@ export default function DiceGame() {
           ? diceValueTwo
           : diceValueThree;
 
+    // Fireball solo acepta el dado mágico (die three)
+    if (slot === "special1" && character?.id === "wizard" && selected !== "three") {
+      setUiMsg("Fireball only accepts the magic die.");
+      return;
+    }
+    // Hidden Blade solo acepta dados de 1 o 2
+    if (slot === "special1" && character?.id === "rogue" && value > 2) {
+      setUiMsg("Hidden Blade only accepts dice of 1 or 2.");
+      return;
+    }
+
     //Se revisa si es ataque o defensa con odd y even
     if (slot === "attack" && !isEven(value)) {
       setUiMsg("Attack accepts even numbers only.");
@@ -261,6 +288,26 @@ export default function DiceGame() {
   const isEven = (n) => typeof n === "number" && n !== 0 && n % 2 === 0;
   const isOdd = (n) => typeof n === "number" && n !== 0 && n % 2 !== 0;
 
+  // Dice modification helpers
+  const hasDiceMod = character?.id === "barbarian" || character?.id === "wizard";
+
+  const applyPlusOne = (which) => {
+    if (dicePlusOneUsed) return;
+    const setters = { one: setDiceValueOne, two: setDiceValueTwo, three: setDiceValueThree };
+    const vals = { one: diceValueOne, two: diceValueTwo, three: diceValueThree };
+    const newVal = Math.min(6, (vals[which] || 0) + 1);
+    setters[which](newVal);
+    setDicePlusOneUsed(true);
+  };
+
+  const applyReroll = (which) => {
+    if (rerollUsed || rerollCooldown > 0) return;
+    const setters = { one: setDiceValueOne, two: setDiceValueTwo, three: setDiceValueThree };
+    setters[which](rollDice());
+    setRerollUsed(true);
+    socket.emit("usedReroll", { roomId });
+  };
+
   //Track num of players, update values to enemy, listen to end of round sequence
   useEffect(() => {
     const onRoomCreated = ({ roomId }) => {
@@ -271,7 +318,6 @@ export default function DiceGame() {
 
     const onJoinedRoom = ({ roomId }) => {
       setRoomId(roomId);
-      setMode("inRoom");
       setGameMsg(`Room: ${roomId}`);
     };
 
@@ -292,6 +338,13 @@ export default function DiceGame() {
       resetLocalRound();
     };
 
+   const onTimerTick = (seconds) => {
+  setTimeLeft(seconds);
+  if (seconds <= 0 && !submitted) {
+    sendValues();
+  }
+};
+
     const onOpponentLeft = () => {
       if (modeRef.current === "endGame") return;
       setGameMsg("Your opponent left. Returning to lobby…");
@@ -300,24 +353,73 @@ export default function DiceGame() {
 
     const onPlayerCountUpdate = (count) => {
       setPlayerCount(count);
-      if (count === 2) setMode("inRoom");
+    };
+
+    const onBothPlayersJoined = ({ roomId }) => {
+      setRoomId(roomId);
+      setMode("charSelect");
     };
 
     const onPlayerValuesUpdated = ({ players }) => {
       if (players[userId]?.values?.hp !== undefined)
         setHp(players[userId].values.hp);
+      if (players[userId]?.values?.rageCharges !== undefined)
+        setRageCharges(players[userId].values.rageCharges);
+      if (players[userId]?.values?.rageReady !== undefined)
+        setRageReady(players[userId].values.rageReady);
+      if (players[userId]?.values?.fireballActive !== undefined)
+        setFireballActive(players[userId].values.fireballActive);
+      if (players[userId]?.values?.fireballPower !== undefined)
+        setFireballPower(players[userId].values.fireballPower);
+      if (players[userId]?.values?.hideActive !== undefined)
+        setHideActive(players[userId].values.hideActive);
+      if (players[userId]?.values?.hideExitBonus !== undefined)
+        setHideExitBonus(players[userId].values.hideExitBonus);
+      if (players[userId]?.values?.rerollCooldown !== undefined)
+        setRerollCooldown(players[userId].values.rerollCooldown);
       const enemy = Object.entries(players).find(([id]) => id !== userId);
       if (enemy) setEnemyValues(enemy[1].values);
     };
 
-    const onRoundStart = ({ roundNumber }) => {
+    const onRoundStart = ({ roundNumber, players }) => {
       setRoundNumber(roundNumber);
       setGameMsg(`Round ${roundNumber}`);
+      setMode("inRoom");
+      if (players) {
+        if (players[userId]?.values?.hp !== undefined)
+          setHp(players[userId].values.hp);
+        if (players[userId]?.values?.rageCharges !== undefined)
+          setRageCharges(players[userId].values.rageCharges);
+        if (players[userId]?.values?.rageReady !== undefined)
+          setRageReady(players[userId].values.rageReady);
+        if (players[userId]?.values?.fireballActive !== undefined)
+          setFireballActive(players[userId].values.fireballActive);
+        if (players[userId]?.values?.fireballPower !== undefined)
+          setFireballPower(players[userId].values.fireballPower);
+        if (players[userId]?.values?.hideActive !== undefined)
+          setHideActive(players[userId].values.hideActive);
+        if (players[userId]?.values?.hideExitBonus !== undefined)
+          setHideExitBonus(players[userId].values.hideExitBonus);
+        const enemy = Object.entries(players).find(([id]) => id !== userId);
+        if (enemy) setEnemyValues(enemy[1].values);
+      }
     };
 
     const onRoundResult = ({ players }) => {
       const updatedHp = players[userId]?.values.hp;
       if (updatedHp !== undefined) setHp(updatedHp);
+      if (players[userId]?.values?.rageCharges !== undefined)
+        setRageCharges(players[userId].values.rageCharges);
+      if (players[userId]?.values?.rageReady !== undefined)
+        setRageReady(players[userId].values.rageReady);
+      if (players[userId]?.values?.fireballActive !== undefined)
+        setFireballActive(players[userId].values.fireballActive);
+      if (players[userId]?.values?.fireballPower !== undefined)
+        setFireballPower(players[userId].values.fireballPower);
+      if (players[userId]?.values?.hideActive !== undefined)
+        setHideActive(players[userId].values.hideActive);
+      if (players[userId]?.values?.hideExitBonus !== undefined)
+        setHideExitBonus(players[userId].values.hideExitBonus);
       const enemy = Object.entries(players).find(([id]) => id !== userId);
       if (enemy) setEnemyValues(enemy[1].values);
       resetLocalRound();
@@ -350,12 +452,14 @@ export default function DiceGame() {
     socket.on("returnedToLobby", onReturnedToLobby);
     socket.on("opponentLeft", onOpponentLeft);
     socket.on("playerCountUpdate", onPlayerCountUpdate);
+    socket.on("bothPlayersJoined", onBothPlayersJoined);
     socket.on("playerValuesUpdated", onPlayerValuesUpdated);
     socket.on("roundStart", onRoundStart);
     socket.on("roundResult", onRoundResult);
     socket.on("endGame", onEndGame);
     socket.on("gameReset", onGameReset);
     socket.on("roomFull", onRoomFull);
+    socket.on("timerTick", onTimerTick);
 
     return () => {
       socket.off("roomCreated", onRoomCreated);
@@ -363,13 +467,15 @@ export default function DiceGame() {
       socket.off("returnedToLobby", onReturnedToLobby);
       socket.off("opponentLeft", onOpponentLeft);
       socket.off("playerCountUpdate", onPlayerCountUpdate);
+      socket.off("bothPlayersJoined", onBothPlayersJoined);
       socket.off("playerValuesUpdated", onPlayerValuesUpdated);
       socket.off("roundStart", onRoundStart);
       socket.off("roundResult", onRoundResult);
       socket.off("endGame", onEndGame);
       socket.off("gameReset", onGameReset);
       socket.off("roomFull", onRoomFull);
-      socket.disconnect(); // limpieza real al desmontar
+      socket.off("timerTick", onTimerTick);
+      socket.disconnect();
     };
   }, []);
 
@@ -399,6 +505,15 @@ export default function DiceGame() {
 
       {mode === "waiting" && <Waiting roomId={roomId} onLeave={leaveRoom} />}
 
+      {mode === "charSelect" && (
+        <CharacterSelect
+          socket={socket}
+          roomId={roomId}
+          onLeave={leaveRoom}
+          onCharacterSelected={setCharacter}
+        />
+      )}
+
       {mode === "inRoom" && (
         <>
           <div className="topbar">
@@ -415,7 +530,7 @@ export default function DiceGame() {
           <div className="gameComponent">
             <div className="timer">
               <FontAwesomeIcon icon={faHourglass} size="2x" />
-              <span>00:30:00</span>
+              <span>{timeLeft}s</span>
               <FontAwesomeIcon icon={faHourglass} size="2x" />
             </div>
 
@@ -451,7 +566,7 @@ export default function DiceGame() {
                       />
                     </button>
                     <button
-                      className="die extra"
+                      className={`die extra${character?.dice?.magic > 0 ? " magic" : ""}`}
                       onClick={() => handleSelectDie("three")}
                       disabled={!diceValueThree || used.three}
                     >
@@ -461,6 +576,42 @@ export default function DiceGame() {
                       />
                     </button>
                   </div>
+
+                  {diceRolled && hasDiceMod && (
+                    <div className="diceMod">
+                      {character?.id === "barbarian" && (
+                        <>
+                          {["one", "two", "three"].map((d) => (
+                            <button
+                              key={d}
+                              onClick={() => applyPlusOne(d)}
+                              disabled={dicePlusOneUsed || used[d]}
+                              title={`+1 to die ${d}`}
+                            >
+                              +1
+                            </button>
+                          ))}
+                          {dicePlusOneUsed && <span>Dice +1 used</span>}
+                        </>
+                      )}
+                      {character?.id === "wizard" && (
+                        <>
+                          {["one", "two", "three"].map((d) => (
+                            <button
+                              key={d}
+                              onClick={() => applyReroll(d)}
+                              disabled={rerollUsed || rerollCooldown > 0 || used[d]}
+                              title={`Reroll die ${d}`}
+                            >
+                              ↺
+                            </button>
+                          ))}
+                          {rerollCooldown > 0 && <span>Reroll CD: {rerollCooldown}</span>}
+                          {rerollUsed && <span>Rerolled</span>}
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   <div className="values">
                     <p>
@@ -479,17 +630,47 @@ export default function DiceGame() {
                 <div className="character">
                   <div className="characterCard">
                     <div className="cardButtons">
-                      <button onClick={() => handlePlace("attack")}>
+                      <button
+                        onClick={() => handlePlace("attack")}
+                        disabled={hideActive && character?.id === "rogue"}
+                        className={hideActive && character?.id === "rogue" ? "slot-locked" : ""}
+                      >
                         <FontAwesomeIcon icon={faHandFist} size="2x" />
+                        <span>
+                          Attack
+                          {rageReady ? " x2" : ""}
+                          {hideExitBonus && character?.id === "rogue" ? " +1" : ""}
+                        </span>
                       </button>
                       <button onClick={() => handlePlace("defense")}>
                         <FontAwesomeIcon icon={faShieldHalved} size="2x" />
+                        <span>Defense</span>
                       </button>
-                      <button onClick={() => handlePlace("special1")}>
+                      <button
+                        onClick={() => handlePlace("special1")}
+                        disabled={rageReady}
+                        className={rageReady ? "slot-locked" : ""}
+                      >
                         <FontAwesomeIcon icon={faStar} size="2x" />
+                        <span>
+                          {character?.id === "barbarian" && (
+                            rageReady ? "Rage (READY)" :
+                            rageCharges > 0 ? `Rage (${rageCharges}/2)` : "Rage"
+                          )}
+                          {character?.id === "wizard" && (
+                            fireballActive ? `Fireball (${fireballPower})` : "Fireball"
+                          )}
+                          {character?.id === "rogue" && "Hidden Blade"}
+                          {!character && "Special 1"}
+                        </span>
                       </button>
                       <button onClick={() => handlePlace("special2")}>
                         <FontAwesomeIcon icon={faStar} size="2x" />
+                        <span>
+                          {character?.id === "rogue"
+                            ? hideActive ? "Hide (ON)" : "Hide"
+                            : character?.skills?.special2?.name ?? "Special 2"}
+                        </span>
                       </button>
                     </div>
                   </div>

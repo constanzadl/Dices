@@ -62,6 +62,15 @@ h2 {
   background: none;
   color: white;
 }
+.slot-locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(60%);
+}
+.die.magic {
+  color: #c084fc;
+  filter: drop-shadow(0 0 4px #a855f7) drop-shadow(0 0 10px #eab308);
+}
 .character {
   display: flex;
   gap: var(--space-4);
