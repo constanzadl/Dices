@@ -351,9 +351,10 @@ export default function DiceGame() {
       setRoomId("");
       setPlayerCount(0);
       setGameMsg("");
-      setHp(10);
+      setHp(0);
+      setCharacter(null);
       setEnemyValues({
-        hp: 10,
+        hp: 0,
         diceOne: 0,
         diceTwo: 0,
         diceThree: 0,
