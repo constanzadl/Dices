@@ -232,6 +232,31 @@ export default function DiceGame() {
           ? diceValueTwo
           : diceValueThree;
 
+    // Dice +1 (Barbarian special2) — modifica el dado y lo devuelve disponible
+    if (slot === "special2" && character?.id === "barbarian") {
+      if (dicePlusOneUsed) { setUiMsg("Dice +1 already used this round."); return; }
+      if (value >= 6) { setUiMsg("Max number reached."); return; }
+      const setters = { one: setDiceValueOne, two: setDiceValueTwo, three: setDiceValueThree };
+      setters[selected](value + 1);
+      setDicePlusOneUsed(true);
+      setSelected(null);
+      setUiMsg("");
+      return;
+    }
+
+    // Reroll (Wizard special2) — rerollea el dado y lo devuelve disponible
+    if (slot === "special2" && character?.id === "wizard") {
+      if (rerollUsed) { setUiMsg("Re-roll already used this round."); return; }
+      if (rerollCooldown > 0) { setUiMsg(`Re-roll on cooldown (${rerollCooldown} turns).`); return; }
+      const setters = { one: setDiceValueOne, two: setDiceValueTwo, three: setDiceValueThree };
+      setters[selected](rollDice());
+      setRerollUsed(true);
+      socket.emit("usedReroll", { roomId });
+      setSelected(null);
+      setUiMsg("");
+      return;
+    }
+
     // Fireball solo acepta el dado mágico (die three)
     if (slot === "special1" && character?.id === "wizard" && selected !== "three") {
       setUiMsg("Fireball only accepts the magic die.");
@@ -577,41 +602,6 @@ export default function DiceGame() {
                     </button>
                   </div>
 
-                  {diceRolled && hasDiceMod && (
-                    <div className="diceMod">
-                      {character?.id === "barbarian" && (
-                        <>
-                          {["one", "two", "three"].map((d) => (
-                            <button
-                              key={d}
-                              onClick={() => applyPlusOne(d)}
-                              disabled={dicePlusOneUsed || used[d]}
-                              title={`+1 to die ${d}`}
-                            >
-                              +1
-                            </button>
-                          ))}
-                          {dicePlusOneUsed && <span>Dice +1 used</span>}
-                        </>
-                      )}
-                      {character?.id === "wizard" && (
-                        <>
-                          {["one", "two", "three"].map((d) => (
-                            <button
-                              key={d}
-                              onClick={() => applyReroll(d)}
-                              disabled={rerollUsed || rerollCooldown > 0 || used[d]}
-                              title={`Reroll die ${d}`}
-                            >
-                              ↺
-                            </button>
-                          ))}
-                          {rerollCooldown > 0 && <span>Reroll CD: {rerollCooldown}</span>}
-                          {rerollUsed && <span>Rerolled</span>}
-                        </>
-                      )}
-                    </div>
-                  )}
 
                   <div className="values">
                     <p>
